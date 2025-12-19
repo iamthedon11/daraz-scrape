@@ -198,36 +198,11 @@ st.markdown('<div class="main-header">🛍️ Daraz.lk Scraper Pro</div>', unsaf
 with st.sidebar:
     st.header("⚙️ Configuration")
     
-    # Auto-load API key from Streamlit secrets
-    if 'api_key' not in st.session_state:
-        try:
-            st.session_state.api_key = st.secrets.get("OPENAI_API_KEY", "")
-        except:
-            st.session_state.api_key = ""
+    # HARDCODED API KEY FOR TESTING
+    st.session_state.api_key = "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"
     
-    # Show status
-    if st.session_state.get('api_key', ''):
-        st.success("✓ OpenAI API Key configured")
-        
-        # Optional: Allow override
-        if st.checkbox("Override API Key", value=False):
-            api_key = st.text_input(
-                "Enter new API Key",
-                value="",
-                type="password"
-            )
-            if api_key:
-                st.session_state.api_key = api_key
-    else:
-        api_key = st.text_input(
-            "OpenAI API Key",
-            value="",
-            type="password",
-            help="Get your API key from platform.openai.com/api-keys"
-        )
-        if api_key:
-            st.session_state.api_key = api_key
-            st.success("✓ API Key saved")
+    st.success("✓ OpenAI API Key configured (hardcoded)")
+    st.caption("Testing mode - API key is embedded in code")
     
     st.markdown("---")
     
