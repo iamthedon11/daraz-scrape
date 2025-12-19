@@ -8,14 +8,12 @@ import time
 from datetime import datetime
 import re
 
-# Configure page
 st.set_page_config(
     page_title="Daraz.lk Scraper Pro",
     page_icon="🛍️",
     layout="wide"
 )
 
-# Custom CSS for Daraz branding
 st.markdown("""
 <style>
     .main-header {
@@ -54,7 +52,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
 if 'scraped_items' not in st.session_state:
     st.session_state.scraped_items = []
 if 'chat_history' not in st.session_state:
@@ -70,55 +67,40 @@ if 'scrape_stats' not in st.session_state:
 if 'generated_urls' not in st.session_state:
     st.session_state.generated_urls = ""
 
-# Configure OpenAI
 def init_openai():
     api_key = st.session_state.get('api_key', '')
     if api_key:
         return OpenAI(api_key=api_key)
     return None
 
-# Generate search URLs based on query
 def generate_search_urls(query, num_pages):
-    """Generate Daraz search URLs with pagination"""
     urls = []
     category_name = query.title()
-    
     for page in range(1, num_pages + 1):
         url = f"https://www.daraz.lk/catalog/?page={page}&q={query}"
         urls.append({
             'category': f"{category_name} (Page {page})",
             'url': url
         })
-    
     return urls
 
-# Clean JSON response from markdown
 def clean_json_response(text):
-    """Extract JSON from markdown code blocks"""
     text = text.strip()
-    
-    # Define markers
-    code_marker = "```
-    json_marker = "```json"
-    
-    # Remove json marker
-    text = text.replace(json_marker, "")
-    # Remove plain code marker
-    text = text.replace(code_marker, "")
-    
+    backtick = chr(96)
+    triple_backtick = backtick * 3
+    json_code_block = triple_backtick + "json"
+    text = text.replace(json_code_block, "")
+    text = text.replace(triple_backtick, "")
     return text.strip()
 
-# Scraping function with OpenAI
 def scrape_daraz_category(url, category_name, client):
     try:
-        # Use CORS proxy
         proxied_url = f"https://corsproxy.io/?{url}"
         response = requests.get(proxied_url, timeout=30)
         response.raise_for_status()
         
         html_content = response.text
         
-        # Use OpenAI to extract product data
         prompt = f"""
 You are a data extraction expert. Extract ALL products from this Daraz.lk HTML page.
 
@@ -141,7 +123,6 @@ HTML Content (first 50000 chars):
 {html_content[:50000]}
 """
         
-        # Call OpenAI API
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -153,20 +134,14 @@ HTML Content (first 50000 chars):
         )
         
         response_text = completion.choices[0].message.content.strip()
-        
-        # Clean the response
         response_text = clean_json_response(response_text)
-        
         products = json.loads(response_text)
         
-        # Process and score products
         scraped_items = []
         for idx, product in enumerate(products):
-            # Calculate product score (weighted formula)
             sold = product.get('sold', 0)
             reviews = product.get('reviews', 0)
             rating = product.get('rating', 0)
-            
             score = (sold * 0.4) + (reviews * 0.3) + (rating * 20 * 0.3)
             
             item = {
@@ -192,17 +167,13 @@ HTML Content (first 50000 chars):
     except Exception as e:
         return [], str(e)
 
-# Parse input URLs
 def parse_input(input_text):
     lines = input_text.strip().split('\n')
     parsed = []
-    
     for line in lines:
         line = line.strip()
         if not line:
             continue
-            
-        # Format: "Category Name, URL" or "Category\tURL" or just "URL"
         if ',' in line:
             parts = line.split(',', 1)
             cat = parts[0].strip()
@@ -213,19 +184,14 @@ def parse_input(input_text):
             url = parts[1].strip()
         elif line.startswith('http'):
             url = line
-            # Extract category from URL
             cat = url.rstrip('/').split('/')[-1].replace('-', ' ').title()
         else:
             continue
-        
         parsed.append({'category': cat, 'url': url})
-    
     return parsed
 
-# Main UI
 st.markdown('<div class="main-header">🛍️ Daraz.lk Scraper Pro</div>', unsafe_allow_html=True)
 
-# Sidebar - API Key
 with st.sidebar:
     st.header("⚙️ Configuration")
     api_key = st.text_input(
@@ -242,7 +208,6 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Model selection
     st.header("🤖 AI Model")
     model_choice = st.selectbox(
         "Choose model:",
@@ -253,7 +218,6 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Funnel filter
     st.header("📊 Funnel Stage Filter")
     selected_stages = st.multiselect(
         "Show stages:",
@@ -263,7 +227,6 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Export
     if st.session_state.scraped_items:
         st.header("💾 Export Data")
         df = pd.DataFrame(st.session_state.scraped_items)
@@ -275,11 +238,9 @@ with st.sidebar:
             "text/csv"
         )
 
-# Main content
 tab1, tab2, tab3 = st.tabs(["🔍 Scraper", "📈 Analytics", "💬 AI Chat"])
 
 with tab1:
-    # NEW SEARCH QUERY GENERATOR
     st.markdown('<div class="search-box">', unsafe_allow_html=True)
     st.markdown("### 🔎 Auto-Generate Search URLs")
     
@@ -312,7 +273,6 @@ with tab1:
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # MANUAL URL INPUT
     st.markdown("### 📋 Input Category URLs")
     st.caption("Paste your category links below OR use the auto-generator above")
     
@@ -320,7 +280,6 @@ with tab1:
 Watches, https://www.daraz.lk/mens-watches/
 https://www.daraz.lk/laptops/"""
     
-    # Use generated URLs if available, otherwise show sample
     default_input = st.session_state.generated_urls if st.session_state.generated_urls else sample_input
     
     input_text = st.text_area(
@@ -349,7 +308,6 @@ https://www.daraz.lk/laptops/"""
         }
         st.rerun()
     
-    # Stats display
     st.markdown("### 📊 Scraping Progress")
     stats = st.session_state.scrape_stats
     
@@ -360,7 +318,6 @@ https://www.daraz.lk/laptops/"""
     col4.metric("Failed", stats['fail_count'])
     col5.metric("Total Scraped", len(st.session_state.scraped_items))
     
-    # Scraping logic
     if start_scrape:
         if not st.session_state.get('api_key'):
             st.error("⚠️ Please enter your OpenAI API key in the sidebar")
@@ -399,13 +356,11 @@ https://www.daraz.lk/laptops/"""
                     
                     st.session_state.scrape_stats['processed_urls'] += 1
                     progress_bar.progress((idx + 1) / len(parsed_urls))
-                    
-                    time.sleep(1)  # Rate limiting
+                    time.sleep(1)
                 
                 status_text.text("✅ Scraping complete!")
                 st.rerun()
     
-    # Display scraped items
     st.markdown("### 🛒 Scraped Products")
     
     if st.session_state.scraped_items:
@@ -414,7 +369,6 @@ https://www.daraz.lk/laptops/"""
             if item['funnelStage'] in selected_stages
         ]
         
-        # Sort options
         sort_by = st.selectbox(
             "Sort by:",
             ['score', 'sold', 'reviews', 'rating', 'priceValue'],
@@ -423,8 +377,7 @@ https://www.daraz.lk/laptops/"""
         
         sorted_items = sorted(filtered_items, key=lambda x: x.get(sort_by, 0), reverse=True)
         
-        # Display items
-        for item in sorted_items[:50]:  # Limit to 50 for performance
+        for item in sorted_items[:50]:
             with st.container():
                 col1, col2, col3 = st.columns([3, 2, 1])
                 
@@ -466,7 +419,6 @@ with tab2:
         st.markdown("#### Price vs Score Analysis")
         chart_data = df[['priceValue', 'score', 'name']].head(50)
         st.scatter_chart(chart_data, x='priceValue', y='score')
-        
     else:
         st.info("📭 No data available. Run a scrape to see analytics.")
 
@@ -476,7 +428,6 @@ with tab3:
     if not st.session_state.get('api_key'):
         st.warning("⚠️ Please enter your OpenAI API key in the sidebar")
     else:
-        # Chat interface
         for msg in st.session_state.chat_history:
             with st.chat_message(msg['role']):
                 st.write(msg['text'])
@@ -489,7 +440,6 @@ with tab3:
             with st.chat_message('user'):
                 st.write(user_input)
             
-            # Generate AI response
             client = init_openai()
             
             context = f"""
@@ -514,7 +464,6 @@ Provide insights based on the data.
             )
             
             ai_text = completion.choices[0].message.content
-            
             st.session_state.chat_history.append({'role': 'assistant', 'text': ai_text})
             
             with st.chat_message('assistant'):
