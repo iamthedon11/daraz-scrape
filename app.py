@@ -92,6 +92,27 @@ def generate_search_urls(query, num_pages):
     
     return urls
 
+# Clean JSON response from markdown
+def clean_json_response(text):
+    """Extract JSON from markdown code blocks"""
+    text = text.strip()
+    
+    # Remove markdown code blocks
+    if text.startswith("```
+        # Find first newline after opening ```
+        first_newline = text.find('\n')
+        if first_newline != -1:
+            text = text[first_newline + 1:]
+        
+        # Remove closing ```
+        if text.endswith("```"):
+            text = text[:-3]
+    
+    # Also handle ```
+    text = text.replace("```json", "").replace("```
+    
+    return text.strip()
+
 # Scraping function with OpenAI
 def scrape_daraz_category(url, category_name, client):
     try:
@@ -115,17 +136,10 @@ For each product, extract:
 - Price (in Rs., numeric value only)
 - Product URL (full link)
 
-Return ONLY a valid JSON array like:
+Return ONLY a valid JSON array. No markdown formatting, no explanations.
+Format:
 [
-  {{
-    "name": "Product Name",
-    "sold": 120,
-    "reviews": 45,
-    "rating": 4.5,
-    "seller": "Seller Name",
-    "price": 12500,
-    "productUrl": "https://www.daraz.lk/products/..."
-  }}
+  {{"name": "Product Name", "sold": 120, "reviews": 45, "rating": 4.5, "seller": "Seller Name", "price": 12500, "productUrl": "https://www.daraz.lk/products/..."}}
 ]
 
 HTML Content (first 50000 chars):
@@ -136,20 +150,17 @@ HTML Content (first 50000 chars):
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a data extraction expert. Always return valid JSON."},
+                {"role": "system", "content": "You are a data extraction expert. Always return valid JSON without markdown formatting."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
             max_tokens=4000
         )
         
-        response_text = completion.choices[0].message.content.strip()
+        response_text = completion.choices.message.content.strip()
         
-        # Extract JSON from markdown code blocks if present
-        if "```
-            response_text = response_text.split("```json").split("```
-        elif "```" in response_text:
-            response_text = response_text.split("``````")[0].strip()
+        # Clean the response
+        response_text = clean_json_response(response_text)
         
         products = json.loads(response_text)
         
@@ -199,12 +210,12 @@ def parse_input(input_text):
         # Format: "Category Name, URL" or "Category\tURL" or just "URL"
         if ',' in line:
             parts = line.split(',', 1)
-            cat = parts[0].strip()
-            url = parts[1].strip()
+            cat = parts.strip()
+            url = parts.strip()
         elif '\t' in line:
             parts = line.split('\t', 1)
-            cat = parts[0].strip()
-            url = parts[1].strip()
+            cat = parts.strip()
+            url = parts.strip()
         elif line.startswith('http'):
             url = line
             # Extract category from URL
@@ -277,7 +288,7 @@ with tab1:
     st.markdown('<div class="search-box">', unsafe_allow_html=True)
     st.markdown("### 🔎 Auto-Generate Search URLs")
     
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns()
     
     with col1:
         search_query = st.text_input(
@@ -324,7 +335,7 @@ https://www.daraz.lk/laptops/"""
         help="Format: 'Category Name, URL' or 'Category\\tURL' or just 'URL'"
     )
     
-    col1, col2, col3 = st.columns([1, 1, 2])
+    col1, col2, col3 = st.columns()
     
     with col1:
         start_scrape = st.button("▶️ Start Scraping", type="primary", use_container_width=True)
@@ -420,7 +431,7 @@ https://www.daraz.lk/laptops/"""
         # Display items
         for item in sorted_items[:50]:  # Limit to 50 for performance
             with st.container():
-                col1, col2, col3 = st.columns([3, 2, 1])
+                col1, col2, col3 = st.columns()
                 
                 with col1:
                     st.markdown(f"**{item['name']}**")
@@ -507,7 +518,7 @@ Provide insights based on the data.
                 max_tokens=1000
             )
             
-            ai_text = completion.choices[0].message.content
+            ai_text = completion.choices.message.content
             
             st.session_state.chat_history.append({'role': 'assistant', 'text': ai_text})
             
