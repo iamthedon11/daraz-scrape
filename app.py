@@ -44,6 +44,13 @@ st.markdown("""
         border-radius: 20px;
         font-weight: bold;
     }
+    .search-box {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border: 2px solid #F57224;
+        margin-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -60,6 +67,8 @@ if 'scrape_stats' not in st.session_state:
         'success_count': 0,
         'fail_count': 0
     }
+if 'generated_urls' not in st.session_state:
+    st.session_state.generated_urls = ""
 
 # Configure OpenAI
 def init_openai():
@@ -67,6 +76,21 @@ def init_openai():
     if api_key:
         return OpenAI(api_key=api_key)
     return None
+
+# Generate search URLs based on query
+def generate_search_urls(query, num_pages):
+    """Generate Daraz search URLs with pagination"""
+    urls = []
+    category_name = query.title()
+    
+    for page in range(1, num_pages + 1):
+        url = f"https://www.daraz.lk/catalog/?page={page}&q={query}"
+        urls.append({
+            'category': f"{category_name} (Page {page})",
+            'url': url
+        })
+    
+    return urls
 
 # Scraping function with OpenAI
 def scrape_daraz_category(url, category_name, client):
@@ -110,7 +134,7 @@ HTML Content (first 50000 chars):
         
         # Call OpenAI API
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",  # Fast and cheap model
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a data extraction expert. Always return valid JSON."},
                 {"role": "user", "content": prompt}
@@ -122,10 +146,10 @@ HTML Content (first 50000 chars):
         response_text = completion.choices[0].message.content.strip()
         
         # Extract JSON from markdown code blocks if present
-        if '```
-            response_text = response_text.split('```json').split('```
-        elif '```' in response_text:
-            response_text = response_text.split('``````')[0].strip()
+        if "```
+            response_text = response_text.split("```json").split("```
+        elif "```" in response_text:
+            response_text = response_text.split("``````")[0].strip()
         
         products = json.loads(response_text)
         
@@ -249,16 +273,53 @@ with st.sidebar:
 tab1, tab2, tab3 = st.tabs(["🔍 Scraper", "📈 Analytics", "💬 AI Chat"])
 
 with tab1:
+    # NEW SEARCH QUERY GENERATOR
+    st.markdown('<div class="search-box">', unsafe_allow_html=True)
+    st.markdown("### 🔎 Auto-Generate Search URLs")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        search_query = st.text_input(
+            "Enter search query:",
+            placeholder="e.g., racks, laptops, phones",
+            help="Enter a keyword to search on Daraz"
+        )
+    
+    with col2:
+        num_pages = st.number_input(
+            "Number of pages:",
+            min_value=1,
+            max_value=50,
+            value=3,
+            help="How many result pages to scrape?"
+        )
+    
+    if st.button("🎯 Generate URLs", type="primary", use_container_width=True):
+        if search_query:
+            generated = generate_search_urls(search_query, num_pages)
+            url_text = "\n".join([f"{item['category']}\t{item['url']}" for item in generated])
+            st.session_state.generated_urls = url_text
+            st.success(f"✅ Generated {num_pages} URLs for '{search_query}'")
+        else:
+            st.error("⚠️ Please enter a search query")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # MANUAL URL INPUT
     st.markdown("### 📋 Input Category URLs")
-    st.caption("Paste your category links below to extract product data, analyze performance, and calculate product scores automatically.")
+    st.caption("Paste your category links below OR use the auto-generator above")
     
     sample_input = """Smartphones\thttps://www.daraz.lk/smartphones/
 Watches, https://www.daraz.lk/mens-watches/
 https://www.daraz.lk/laptops/"""
     
+    # Use generated URLs if available, otherwise show sample
+    default_input = st.session_state.generated_urls if st.session_state.generated_urls else sample_input
+    
     input_text = st.text_area(
         "Enter URLs (one per line)",
-        value=sample_input,
+        value=default_input,
         height=150,
         help="Format: 'Category Name, URL' or 'Category\\tURL' or just 'URL'"
     )
@@ -272,6 +333,7 @@ https://www.daraz.lk/laptops/"""
     
     if clear_data:
         st.session_state.scraped_items = []
+        st.session_state.generated_urls = ""
         st.session_state.scrape_stats = {
             'total_urls': 0,
             'processed_urls': 0,
