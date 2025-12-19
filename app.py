@@ -442,7 +442,8 @@ with tab3:
             
             client = init_openai()
             
-            context = f"""
+            if client:
+                context = f"""
 You are a data analysis assistant. The user has scraped {len(st.session_state.scraped_items)} products from Daraz.lk.
 
 Sample data (first 5 products):
@@ -452,19 +453,21 @@ User question: {user_input}
 
 Provide insights based on the data.
 """
-            
-            completion = client.chat.completions.create(
-                model=st.session_state.get('model_choice', 'gpt-4o-mini'),
-                messages=[
-                    {"role": "system", "content": "You are a helpful data analysis assistant."},
-                    {"role": "user", "content": context}
-                ],
-                temperature=0.7,
-                max_tokens=1000
-            )
-            
-            ai_text = completion.choices[0].message.content
-            st.session_state.chat_history.append({'role': 'assistant', 'text': ai_text})
-            
-            with st.chat_message('assistant'):
-                st.write(ai_text)
+                
+                completion = client.chat.completions.create(
+                    model=st.session_state.get('model_choice', 'gpt-4o-mini'),
+                    messages=[
+                        {"role": "system", "content": "You are a helpful data analysis assistant."},
+                        {"role": "user", "content": context}
+                    ],
+                    temperature=0.7,
+                    max_tokens=1000
+                )
+                
+                ai_text = completion.choices[0].message.content
+                st.session_state.chat_history.append({'role': 'assistant', 'text': ai_text})
+                
+                with st.chat_message('assistant'):
+                    st.write(ai_text)
+            else:
+                st.error("⚠️ Please enter your OpenAI API key in the sidebar first")
